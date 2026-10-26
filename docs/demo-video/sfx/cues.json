@@ -1,0 +1,21 @@
+{
+  "duration": 23.6,
+  "music": {"file": "music-2", "gain_db": -6, "crossfade": 0.012, "segments": [[0, 17.159], [15.016, 17.159], [17.159, null]], "fade_out_at": 22.9, "fade_out": 0.7, "why": "the take resolves at 17.16 s (bar 8 at 112 BPM); bar 7 plays twice so the final chord lands at 19.30 s, just after the end-card title"},
+  "loudness": {"lufs": -16, "true_peak": -1.5},
+  "cues": [
+    {"at": 0.6, "sound": "thock-1", "gain_db": -8.4, "length": 1.9, "why": "typing the prompt into Codex (thocky keys)"},
+    {"at": 2.65, "sound": "click-2", "gain_db": -9.4, "length": 0.2, "why": "Enter sends the prompt"},
+    {"at": 3.5, "sound": "tick-2", "gain_db": -10.5, "why": "list_claude_sessions finds the api session"},
+    {"at": 4.95, "sound": "pop-1", "gain_db": -6.9, "why": "Codex's message pops out of send_to_claude"},
+    {"at": 5.3, "sound": "swoosh-1", "gain_db": -11.5, "length": 0.7, "why": "it flies to Claude"},
+    {"at": 6.0, "sound": "received-2", "gain_db": -9.6, "why": "it lands in the Claude Code session"},
+    {"at": 7.4, "sound": "tick-2", "gain_db": -12.5, "why": "Read finished"},
+    {"at": 9.42, "sound": "pop-1", "gain_db": -6.9, "why": "Claude's reply pops out of SendMessage"},
+    {"at": 9.77, "sound": "swoosh-1", "gain_db": -11.5, "length": 0.7, "why": "it flies back to Codex"},
+    {"at": 10.47, "sound": "received-2", "gain_db": -9.6, "why": "it lands in Codex as a new turn"},
+    {"at": 14.0, "sound": "tick-2", "gain_db": -10.5, "why": "Codex edits src/auth.ts"},
+    {"at": 16.25, "sound": "chime-2", "gain_db": -11.5, "why": "the tests pass"},
+    {"at": 16.8, "sound": "sparkle-2", "gain_db": -15.1, "why": "Codex reports the fix"},
+    {"at": 18.5, "sound": "reveal-2", "gain_db": -10.0, "why": "the icon reveal: a soft swell into a bell chime"}
+  ]
+}

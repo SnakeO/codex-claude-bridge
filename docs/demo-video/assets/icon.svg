@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Two chat bubbles">
+  <rect width="64" height="64" rx="14" fill="#3D6B8E"/>
+  <path d="M12 16h24a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H22l-7 6v-6h-3a4 4 0 0 1-4-4V20a4 4 0 0 1 4-4z" fill="#F4F1EA"/>
+  <path d="M52 26H44v8a8 8 0 0 1-8 8h-6v2a4 4 0 0 0 4 4h12l6 5v-5h0a4 4 0 0 0 4-4V30a4 4 0 0 0-4-4z" fill="#A9C7DD"/>
+  <circle cx="17" cy="26" r="2.2" fill="#3D6B8E"/>
+  <circle cx="24" cy="26" r="2.2" fill="#3D6B8E"/>
+  <circle cx="31" cy="26" r="2.2" fill="#3D6B8E"/>
+</svg>
