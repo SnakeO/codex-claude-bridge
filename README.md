@@ -1,5 +1,7 @@
 # codex-claude-bridge
 
+https://github.com/user-attachments/assets/097e77f5-1ec8-4344-b651-64bb593a6868
+
 A Codex plugin that lets Codex talk with the [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) sessions running on your computer, in both directions:
 
 - **Codex → Claude.** Codex lists your Claude Code sessions, sends one a message, and gets the reply back as a new turn in the same Codex chat.
@@ -209,6 +211,7 @@ plugins/claude-bridge/
   server/mcp.mjs                     minimal MCP stdio server
   server/tools.mjs                   the four tools
   skills/claude-bridge/SKILL.md      instructions for Codex
+docs/demo-video/                     the README video, as a web page rendered to MP4
 ```
 
 ## License

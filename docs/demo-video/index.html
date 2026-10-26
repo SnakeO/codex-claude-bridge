@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Claude Bridge demo</title>
+<!--
+  The README demo, as a page. A paused GSAP timeline drives everything; window.seek(t) draws time t and
+  window.DURATION is the length. Open it with ?t=12.5 to see one moment, or ?play to watch it in real time.
+  Render with tools/render_stream.py (see README.md in this folder).
+-->
+<style>
+  :root {
+    --green: #16a34a; --orange: #ea580c; --purple: #9333ea; --rose: #e11d48; --brand: #3d6b8e;
+    --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+  body { font-family: var(--ui); color: #fff; -webkit-font-smoothing: antialiased; }
+  #stage { position: absolute; inset: 0; overflow: hidden; background: #000; }
+
+  /* ---- backdrop: a dot grid and two soft key lights, one behind each window ---- */
+  #bg { position: absolute; inset: 0; background-image: radial-gradient(rgba(255, 255, 255, .085) 1.3px, transparent 1.7px);
+        background-size: 34px 34px; background-position: 10px 14px; }
+  #glow { position: absolute; inset: 0;
+          background: radial-gradient(820px 620px at 26% 34%, rgba(61, 107, 142, .26), transparent 72%),
+                      radial-gradient(820px 620px at 74% 34%, rgba(217, 119, 87, .13), transparent 72%); }
+
+  /* ---- the two terminal windows: macOS light chrome, dark contents ---- */
+  #world { position: absolute; inset: 0; }
+  .win { position: absolute; top: 48px; width: 880px; height: 652px; border-radius: 14px; overflow: hidden; background: #0e0e10;
+         box-shadow: 0 0 0 1px rgba(255, 255, 255, .3), 0 40px 120px rgba(0, 0, 0, .7), 0 12px 40px rgba(0, 0, 0, .5); }
+  #cx { left: 56px; }
+  #cc { left: 984px; }
+  .tl { position: absolute; z-index: 2; top: 25px; width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgba(0, 0, 0, .2); }
+  .tl.r { left: 18px; background: #ff5f57; } .tl.y { left: 38px; background: #febc2e; } .tl.g { left: 58px; background: #28c840; }
+  .ttl { position: absolute; left: 0; top: 0; right: 0; height: 62px; background: #ececee; border-bottom: 1px solid #d4d4d8;
+         display: flex; align-items: center; justify-content: center; gap: 13px; font-size: 22px; font-weight: 800;
+         letter-spacing: .14em; color: #1d1d1f; }
+  /* each app's own icon, from the installed Claude and ChatGPT (Codex) apps */
+  .ttl .lg { width: 44px; height: 44px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .22)); }
+  .tview { position: absolute; left: 0; right: 0; top: 62px; overflow: hidden; padding: 16px 24px 0;
+           font-family: var(--mono); font-size: 17.5px; line-height: 27px; color: #e5e5ea; }
+  #cxview { bottom: 131px; }
+  #ccview { bottom: 119px; padding-top: 18px; }
+  .ln { height: 27px; white-space: pre; }
+  .dimc { color: #7c7c84; } .tint { color: #5eb1ff; } .grn { color: #4ade80; } .wht { color: #fff; } .red { color: #ff8a80; }
+  b { font-weight: 700; }
+
+  /* Codex */
+  .cxhead { width: 330px; margin-bottom: 4px; padding: 8px 14px; border: 1px solid #3a3a3c; border-radius: 8px; line-height: 24px; white-space: pre; }
+  .ublock { position: relative; margin: 0 -24px; padding: 4px 24px; background: rgba(255, 255, 255, .075); }
+  .ublock .fl { position: absolute; inset: 0; background: rgba(147, 51, 234, .5); opacity: 0; }
+  .ublock .ln { position: relative; }
+  .up { color: #c7c7cc; }
+  .srv { color: #67b7c9; } .tool { color: #9fdcf0; }
+  .lav { color: #c4b5fd; }
+  .del { margin: 0 -24px; padding: 0 24px; background: rgba(255, 69, 58, .17); color: #ffb4ad; }
+  .add { margin: 0 -24px; padding: 0 24px; background: rgba(48, 209, 88, .17); color: #a7f3c0; }
+  .cxfoot { position: absolute; left: 24px; right: 24px; bottom: 12px; font-family: var(--mono); }
+  .work { height: 27px; font-size: 17.5px; line-height: 27px; color: #7c7c84; white-space: pre; }
+  .shim { background: linear-gradient(90deg, #8e8e93 30%, #fff 50%, #8e8e93 70%); background-size: 300% 100%;
+          -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .cxcomp { margin-top: 6px; height: 50px; border-radius: 10px; background: #1c1c1f; display: flex; align-items: center; padding: 0 16px;
+            font-size: 17.5px; color: #fff; white-space: pre; }
+  .cxcomp .up { margin-right: 11px; font-weight: 700; }
+  .cxcomp .ph2 { color: #66666d; }
+  .cxhint { margin-top: 6px; height: 22px; display: flex; justify-content: space-between; font-size: 13.5px; line-height: 22px; color: #66666d; padding: 0 4px; }
+  .caret { display: inline-block; width: 10px; height: 21px; background: #d1d1d6; vertical-align: -4px; }
+
+  /* Claude Code */
+  .qblock { border-left: 3px solid #3a3a3c; padding-left: 16px; margin-left: 2px; }
+  .ccstat { position: absolute; left: 24px; right: 24px; bottom: 84px; height: 27px; font-family: var(--mono); font-size: 17.5px;
+            line-height: 27px; white-space: pre; color: #7c7c84; }
+  .ccstat .v { color: #f59e6b; }
+  .prompt { position: absolute; left: 24px; right: 24px; bottom: 22px; height: 54px; border: 1.5px solid #3a3a3c; border-radius: 10px;
+            padding: 0 18px; line-height: 51px; font-family: var(--mono); font-size: 17.5px; color: #7c7c84; }
+  .prompt .blk { display: inline-block; width: 10px; height: 21px; background: #c7c7cc; vertical-align: -4px; }
+
+  /* ---- the spotlight dims whatever is not in play ---- */
+  #spot { position: absolute; left: 0; top: 0; border-radius: 15px; box-shadow: 0 0 0 4000px rgba(0, 0, 0, .5); opacity: 0; }
+
+  /* ---- the light caption card: captions on the left, the wire diagram on the right ---- */
+  #cw { position: absolute; inset: 0; }
+  #card { position: absolute; left: 56px; top: 728px; width: 1808px; height: 300px; border-radius: 14px; background: #f6f6f7;
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, .3), 0 40px 120px rgba(0, 0, 0, .7), 0 12px 40px rgba(0, 0, 0, .5); }
+  #caps { position: absolute; left: 106px; top: 728px; width: 880px; height: 300px; }
+  .cap { position: absolute; left: 0; top: 136px; width: 880px; transform: translateY(-50%); }
+  .num { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+         font-family: var(--display); font-size: 22px; font-weight: 700; opacity: 0; }
+  .ctitle { margin-top: 16px; font-family: var(--display); font-size: 50px; line-height: 1.02; font-weight: 700; letter-spacing: -1.4px; color: #1d1d1f; }
+  .csub { margin-top: 12px; font-size: 25px; line-height: 1.32; color: #6e6e73; }
+  .m { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: .1em; margin-bottom: -.1em; }
+  .w { display: inline-block; transform: translateY(110%); }
+  #steps { position: absolute; left: 106px; top: 984px; display: flex; gap: 10px; }
+  #steps i { position: relative; width: 46px; height: 6px; border-radius: 3px; background: #d1d1d6; overflow: hidden; }
+  #steps b { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); }
+
+  #zone { position: absolute; left: 1040px; top: 760px; width: 796px; height: 240px; border: 1.5px dashed #c7c7cc; border-radius: 18px; }
+  #zone span { position: absolute; left: 20px; top: 13px; font-size: 12.5px; font-weight: 600; letter-spacing: .1em; color: #8e8e93; }
+  #wires { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: visible; }
+  .wl { position: absolute; width: 140px; margin-left: -70px; text-align: center; font-family: var(--mono); font-size: 12.5px; color: #8e8e93; }
+  .node { position: absolute; width: 176px; height: 132px; margin: -66px 0 0 -88px; border-radius: 16px; background: #fff;
+          box-shadow: 0 0 0 1px #e5e5ea, 0 6px 18px rgba(0, 0, 0, .06); text-align: center; padding-top: 16px; }
+  .ni { display: block; margin: 0 auto; width: 48px; height: 48px; border-radius: 12px; }
+  .ni.dark { background: #161618; display: grid; place-items: center; color: #fff; font-family: var(--mono); font-size: 19px; font-weight: 700; }
+  .nt { margin-top: 10px; font-size: 17px; font-weight: 650; color: #1d1d1f; }
+  .ns { margin-top: 1px; font-family: var(--mono); font-size: 12.5px; color: #8e8e93; }
+  .nglow { position: absolute; inset: 0; border-radius: 16px; opacity: 0; }
+  .ring { position: absolute; width: 176px; height: 132px; margin: -66px 0 0 -88px; border-radius: 18px; border: 3px solid var(--green); opacity: 0; }
+  #pulse { position: absolute; left: 0; top: 0; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; opacity: 0; }
+
+  /* ---- the messages that fly between the windows ---- */
+  .capsule { position: absolute; left: 0; top: 0; padding: 10px 18px 11px; border-radius: 16px; background: #fff; white-space: nowrap; opacity: 0;
+             transform-origin: 50% 50%; }
+  .capsule .hd { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .capsule .tx { margin-top: 3px; font-size: 19px; font-weight: 500; color: #1d1d1f; }
+  #capA { box-shadow: inset 4px 0 0 var(--orange), 0 18px 50px rgba(234, 88, 12, .42), 0 6px 18px rgba(0, 0, 0, .4); }
+  #capA .hd { color: var(--orange); }
+  #capB { box-shadow: inset 4px 0 0 var(--purple), 0 18px 50px rgba(147, 51, 234, .45), 0 6px 18px rgba(0, 0, 0, .4); }
+  #capB .hd { color: var(--purple); }
+
+  /* ---- end card ---- */
+  #end { position: absolute; inset: 0; }
+  #eicon { position: absolute; left: 292px; top: 404px; width: 220px; height: 220px; opacity: 0; }
+  #eicon img { width: 100%; height: 100%; filter: drop-shadow(0 24px 60px rgba(61, 107, 142, .6)); }
+  .ering { position: absolute; left: 292px; top: 404px; width: 220px; height: 220px; border-radius: 52px; border: 3px solid #a9c7dd; opacity: 0; }
+  #wm { position: absolute; left: 600px; top: 354px; }
+  .wmt { font-family: var(--display); font-size: 108px; line-height: 1; font-weight: 800; letter-spacing: -3.4px; white-space: nowrap; }
+  .wms { margin-top: 18px; font-size: 34px; line-height: 1.3; color: #98989f; white-space: nowrap; }
+  .cmd { margin-top: 36px; display: inline-block; padding: 18px 26px; border-radius: 16px; background: #141416; border: 1px solid #38383a;
+         font-family: var(--mono); font-size: 24px; line-height: 38px; white-space: pre; }
+  .cmd .d { color: #636366; }
+  .plat { margin-top: 22px; font-size: 22px; color: #8e8e93; }
+  .end-i { opacity: 0; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="bg"></div>
+  <div id="glow"></div>
+
+  <div id="world">
+    <!-- Codex, in ~/my-app -->
+    <div id="cx" class="win">
+      <i class="tl r"></i><i class="tl y"></i><i class="tl g"></i>
+      <div class="ttl"><img class="lg" src="assets/codex.png" alt="">CODEX</div>
+      <div class="tview" id="cxview"><div id="cxscroll">
+        <div class="cxhead"><b>&gt;_ Codex</b> <span class="dimc">(v0.164.0)</span>
+<span class="dimc">directory:</span> ~/my-app</div>
+        <div class="ln"> </div>
+        <div class="ublock" id="u1"><div class="ln" id="c1"><b class="up">›</b> Sessions expire instantly. Ask Claude in ~/api how it sets exp.</div></div>
+        <div class="ln"> </div>
+        <div class="ln" id="c2"><span class="bul" data-run="3.05,3.55">•</span> <b class="vb" data-run="3.05,3.55" data-a="Calling" data-b="Called">Called</b> <span class="srv">claude-bridge.</span><span class="tool">list_claude_sessions</span><span class="dimc">({})</span></div>
+        <div class="ln dimc" id="c3">  └ Claude Code sessions (2):</div>
+        <div class="ln dimc" id="c4">    - "api": idle, ~/api (pid 41822)</div>
+        <div class="ln dimc" id="c5">    - "web": busy, ~/web (pid 41907)</div>
+        <div class="ln"> </div>
+        <div class="ln" id="c6"><span class="bul" data-run="4.8,6.02">•</span> <b class="vb" data-run="4.8,6.02" data-a="Calling" data-b="Called">Called</b> <span class="srv">claude-bridge.</span><span class="tool">send_to_claude</span><span class="dimc">({"to":"api",…})</span></div>
+        <div class="ln dimc" id="c7">  └ Delivered to "api". Its reply arrives in this thread as a new turn, …</div>
+        <div class="ln"> </div>
+        <div class="ln" id="c8">• I asked the api session how it sets exp. Its reply will come here.</div>
+        <div class="ln"> </div>
+        <div class="ublock" id="push"><div class="fl" id="pushfl"></div>
+          <div class="ln" id="c9"><b class="up">›</b> <span class="lav">[Message from Claude Code session "api" - sent by another agent,</span></div>
+          <div class="ln" id="c10"><span class="lav">  not typed by the user]</span></div>
+          <div class="ln" id="c11">  exp is in seconds, the JWT standard (src/tokens.ts:18). Date.now()</div>
+          <div class="ln" id="c12">  is in ms, so compare exp * 1000.</div>
+          <div class="ln dimc" id="c13">  (To answer, call send_to_claude with to: "api".)</div>
+        </div>
+        <div class="ln"> </div>
+        <div class="ln" id="c14"><span class="grn">•</span> <b>Edited</b> src/auth.ts <span class="dimc">(</span><span class="grn">+1</span> <span class="red">-1</span><span class="dimc">)</span></div>
+        <div class="ln del" id="c15">    42 -  if (token.exp &lt; Date.now()) {</div>
+        <div class="ln add" id="c16">    42 +  if (token.exp * 1000 &lt; Date.now()) {</div>
+        <div class="ln"> </div>
+        <div class="ln" id="c17"><span class="bul" data-run="15.2,16.2">•</span> <b class="vb" data-run="15.2,16.2" data-a="Running" data-b="Ran">Ran</b> npm test</div>
+        <div class="ln dimc" id="c18">  └ Tests  42 passed (42)</div>
+        <div class="ln"> </div>
+        <div class="ln" id="c19">• Fixed src/auth.ts: exp is in seconds, so it compares exp * 1000 now.</div>
+      </div></div>
+      <div class="cxfoot">
+        <div class="work" id="cxwork"><span id="wdot">•</span> <span class="shim" id="shim">Working</span> (<span id="cxsec">0s</span> • esc to interrupt)</div>
+        <div class="cxcomp"><b class="up">›</b><span id="cxtxt"></span></div>
+        <div class="cxhint"><span>? for shortcuts</span><span>100% context left</span></div>
+      </div>
+    </div>
+
+    <!-- the Claude Code session, in ~/api -->
+    <div id="cc" class="win">
+      <i class="tl r"></i><i class="tl y"></i><i class="tl g"></i>
+      <div class="ttl"><img class="lg" src="assets/claude.png" alt="">CLAUDE</div>
+      <div class="tview" id="ccview">
+        <div class="ln dimc">&gt; add rate limiting to the login route</div>
+        <div class="ln"> </div>
+        <div class="ln"><span class="wht">⏺</span> Added a limiter to POST /login: 5 attempts a minute per IP.</div>
+        <div class="ln"> </div>
+        <div class="qblock" id="q1">
+          <div class="ln" id="k0"><span class="tint">codex-my-app</span><span class="dimc">  Codex · claude-bridge</span></div>
+          <div class="ln wht" id="k1">How does the api set exp on login tokens? In my-app,</div>
+          <div class="ln wht" id="k2">src/auth.ts:42 treats every token as expired.</div>
+        </div>
+        <div class="ln"> </div>
+        <div class="ln" id="k3"><span class="bul" data-run="6.8,7.4">⏺</span> <b class="wht">Read</b>(src/tokens.ts)</div>
+        <div class="ln dimc" id="k4">  ⎿  Read 61 lines</div>
+        <div class="ln"> </div>
+        <div class="ln" id="k5"><span class="wht">⏺</span> exp is in seconds (the JWT standard), set at src/tokens.ts:18.</div>
+        <div class="ln" id="k6">  my-app compares it with Date.now(), which is in ms.</div>
+        <div class="ln"> </div>
+        <div class="ln" id="k7"><span class="bul" data-run="9.0,9.4">⏺</span> <b class="wht">SendMessage</b>(codex-my-app)</div>
+        <div class="ln dimc" id="k8">  ⎿  Sent: “exp is in seconds, the JWT standard (src/tokens.ts:18)…”</div>
+      </div>
+      <div class="ccstat" id="ccstat"><span class="v" id="ccspin">✻</span> <span class="v" id="ccverb">Reading…</span> (<span id="ccsec">0s</span> · esc to interrupt)</div>
+      <div class="prompt">&gt; <span class="blk" id="blk"></span></div>
+    </div>
+  </div>
+
+  <div id="spot"></div>
+
+  <div id="cw">
+    <div id="card"></div>
+    <div id="caps"></div>
+    <div id="steps"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
+    <div id="zone"><span>YOUR COMPUTER</span></div>
+    <svg id="wires"></svg>
+    <div class="wl" id="wl1">MCP</div>
+    <div class="wl" id="wl2">local socket</div>
+    <div class="node" id="nCx"><div class="nglow"></div><div class="ni dark">&gt;_</div><div class="nt">Codex</div><div class="ns">codex-my-app</div></div>
+    <div class="node" id="nBr"><div class="nglow"></div><img class="ni" src="assets/icon.svg" alt=""><div class="nt">claude-bridge</div><div class="ns">Codex plugin</div></div>
+    <div class="node" id="nCc"><div class="nglow"></div><div class="ni dark"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9l3 3-3 3M12 15h5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="nt">Claude Code</div><div class="ns">api</div></div>
+    <div class="ring" id="ringCc"></div>
+    <div class="ring" id="ringCx"></div>
+    <div id="pulse"></div>
+  </div>
+
+  <div class="capsule" id="capA"><div class="hd">codex-my-app → api</div><div class="tx">How does the api set exp on login tokens?</div></div>
+  <div class="capsule" id="capB"><div class="hd">api → codex-my-app</div><div class="tx">exp is in seconds. Compare exp * 1000.</div></div>
+
+  <div id="end">
+    <div class="ering" id="er1"></div><div class="ering" id="er2"></div>
+    <div id="eicon"><img src="assets/icon.svg" alt=""></div>
+    <div id="wm">
+      <div class="wmt end-i">Claude Bridge</div>
+      <div class="wms end-i">A Codex plugin for two-way chat with your Claude Code sessions.</div>
+      <div class="cmd end-i"><span class="d">$ </span>codex plugin marketplace add SnakeO/codex-claude-bridge
+<span class="d">$ </span>codex plugin add claude-bridge@codex-claude-bridge</div>
+      <div class="plat end-i">macOS · Linux · No dependencies · github.com/SnakeO/codex-claude-bridge</div>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/CustomEase.min.js"></script>
+<script src="js/motionblur.js"></script>
+<script>
+(async () => {
+  gsap.registerPlugin(CustomEase);
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => [...document.querySelectorAll(s)];
+  const DURATION = 23.6;
+  const FPS = 30;
+  const F = 1 / FPS;                       // one frame, for 2-4 frame staggers
+
+  // ---- seeded randomness (typing rhythm only) ----
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+  // ---- named eases ----
+  CustomEase.create('enter', 'M0,0 C0.05,0.7 0.1,1 1,1');       // decelerate
+  CustomEase.create('exit', 'M0,0 C0.3,0 0.8,0.15 1,1');        // accelerate
+  CustomEase.create('move', 'M0,0 C0.62,0 0.14,1 1,1');         // in-out, for travel
+  // a real damped spring, zeta 0.65 (about 7% overshoot), settled at 1
+  const ZETA = 0.65, OMEGA = 8.2, WD = OMEGA * Math.sqrt(1 - ZETA * ZETA);
+  gsap.registerEase('spring', (p) => p >= 1 ? 1 :
+    1 - Math.exp(-ZETA * OMEGA * p) * (Math.cos(WD * p) + (ZETA * OMEGA / WD) * Math.sin(WD * p)));
+
+  // ---- captions ----
+  const CAPS = [
+    { n: 1, color: '#16a34a', title: 'Ask Codex.', sub: ['It finds the Claude Code sessions', 'running on your computer.'] },
+    { n: 2, color: '#ea580c', title: 'It messages Claude.', sub: ['Over Claude Code’s own local sockets.', 'Nothing leaves your computer.'] },
+    { n: 3, color: '#9333ea', title: 'Claude answers.', sub: ['The reply lands in Codex', 'as a new turn.'] },
+    { n: 4, color: '#e11d48', title: 'Codex keeps going.', sub: ['Two agents, one conversation.', 'No copy and paste.'] },
+  ];
+  const mask = (txt) => `<span class="m"><span class="w">${txt}</span></span>`;
+  $('#caps').innerHTML = CAPS.map((c) => `<div class="cap" id="cap${c.n}"><div class="num" style="background:${c.color}">${c.n}</div>` +
+    `<div class="ctitle">${c.title.split(' ').map(mask).join(' ')}</div>` +
+    `<div class="csub">${c.sub.map(mask).join('<br>')}</div></div>`).join('');
+  $$('#steps b').forEach((b, i) => { b.style.background = CAPS[i].color; });
+
+  await document.fonts.ready;
+  await Promise.all([...document.images].map((img) => img.complete || new Promise((r) => { img.onload = img.onerror = r; })));
+
+  // ---- measure (nothing is transformed yet) ----
+  const rect = (el) => { const r = (typeof el === 'string' ? $(el) : el).getBoundingClientRect();
+    return { x: r.left, y: r.top, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; };
+  const R = { cx: rect('#cx'), cc: rect('#cc'), view: rect('#cxview'), nCx: rect('#nCx'), nBr: rect('#nBr'), nCc: rect('#nCc') };
+  const line = (id) => rect(`#${id}`);
+
+  // the wire diagram: two lanes between each pair of nodes, out on top and back underneath
+  const N = { cx: 1150, br: 1440, cc: 1730, y: 884 };
+  [['#nCx', N.cx], ['#nBr', N.br], ['#nCc', N.cc]].forEach(([s, x]) => gsap.set(s, { left: x, top: N.y }));
+  gsap.set('#ringCc', { left: N.cc, top: N.y }); gsap.set('#ringCx', { left: N.cx, top: N.y });
+  const HALF = 88, LANE = 5;
+  const segs = [[N.cx + HALF, N.br - HALF], [N.br + HALF, N.cc - HALF]];
+  $('#wires').innerHTML = segs.map(([a, b], i) =>
+    `<line class="lane" x1="${a}" y1="${N.y - LANE}" x2="${b}" y2="${N.y - LANE}"/>` +
+    `<line class="lane" x1="${a}" y1="${N.y + LANE}" x2="${b}" y2="${N.y + LANE}"/>`).join('');
+  const lanes = $$('#wires .lane');
+  lanes.forEach((l) => { l.setAttribute('stroke-width', '2.5'); l.setAttribute('stroke-linecap', 'round'); });
+  gsap.set('#wl1', { left: (segs[0][0] + segs[0][1]) / 2, top: N.y - 32 });
+  gsap.set('#wl2', { left: (segs[1][0] + segs[1][1]) / 2, top: N.y - 32 });
+
+  // ---- Codex scrolls as its transcript grows: each stop brings one line into view ----
+  const viewH = R.view.h - 16;
+  const scrollFor = (id) => Math.max(0, Math.ceil(line(id).y + line(id).h - R.view.y - 16 - viewH + 10));
+  const SCROLLS = [[10.05, 'c13'], [13.92, 'c16'], [15.12, 'c18'], [16.72, 'c19']].map(([at, id]) => [at, scrollFor(id)]);
+
+  // ---- where the messages fly from and to ----
+  const capSize = (s) => rect(s);
+  const capAz = capSize('#capA'), capBz = capSize('#capB');
+  const scrollAt = (t) => SCROLLS.reduce((s, [at, v]) => (t >= at + 0.4 ? v : s), 0);
+  const flightA = { x0: R.cx.x + 470, y0: line('c6').cy + 44, x1: R.cc.x + 330, y1: line('k1').cy };
+  const flightB = { x0: R.cc.x + 380, y0: line('k8').cy + 44, x1: R.cx.x + 390, y1: line('c11').cy - scrollAt(10.47) };
+  for (const f of [flightA, flightB]) { f.qx = (f.x0 + f.x1) / 2; f.qy = Math.min(f.y0, f.y1) - 190; }
+
+  // ---- state the timeline tweens; apply() turns it into pixels ----
+  const st = { scroll: 0, dim: 0, blur: 0 };
+  const capA = { p: 0, a: 0, s: 0.6 }, capB = { p: 0, a: 0, s: 0.6 };
+  const spot = { x: R.cx.x, y: R.cx.y, w: R.cx.w, h: R.cx.h, a: 0 };
+  const pl = { p: 0, a: 0, lane: 0, rgb: '22,163,74' };      // the pulse on the wires
+  const flow = { a: 0 };                                     // beat 4: both lanes carry traffic
+
+  const tl = gsap.timeline({ paused: true, defaults: { ease: 'enter' } });
+  const _fromTo = tl.fromTo.bind(tl);
+  tl.fromTo = (t, from, to, at) => _fromTo(t, from, { immediateRender: false, ...to }, at);
+
+  // initial state
+  const lineIds = $$('#cxview [id^=c], #ccview [id^=k]').filter((el) => /^[ck]\d+$/.test(el.id));
+  gsap.set(lineIds, { opacity: 0, y: 7 });
+  gsap.set('#push, #q1', { opacity: 0 });
+  gsap.set('#u1', { opacity: 0 });
+  gsap.set('#cxwork, #ccstat', { opacity: 0 });
+  const show = (id, at, dur = 0.28) => tl.to(`#${id}`, { opacity: 1, y: 0, duration: dur }, at);
+
+  const capIn = (n, at) => {
+    tl.fromTo(`#cap${n} .num`, { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: 'spring' }, at);
+    tl.to(`#cap${n} .ctitle .w`, { y: 0, duration: 0.55, stagger: 3 * F }, at + 0.06);
+    tl.to(`#cap${n} .csub .w`, { y: 0, duration: 0.55, stagger: 3 * F }, at + 0.22);
+    tl.to(`#steps i:nth-child(${n}) b`, { scaleX: 1, duration: 0.5, ease: 'move' }, at + 0.1);
+  };
+  const capOut = (n, at) => {
+    tl.to(`#cap${n} .ctitle .w, #cap${n} .csub .w`, { yPercent: -110, duration: 0.24, ease: 'exit', stagger: F }, at);
+    tl.to(`#cap${n} .num`, { scale: 0.6, opacity: 0, duration: 0.22, ease: 'exit' }, at + 0.04);
+  };
+  const spotTo = (r, at, dur = 0.55) => tl.to(spot, { x: r.x, y: r.y, w: r.w, h: r.h, duration: dur, ease: 'move' }, at);
+  const ring = (sel, color, at) => {
+    tl.set(sel, { borderColor: color }, at);
+    tl.fromTo(sel, { scale: 1, opacity: 0.95 }, { scale: 1.22, opacity: 0, duration: 0.7, ease: 'enter' }, at);
+  };
+  // the pulse rides lane 0 (out, left to right) or lane 1 (back, right to left)
+  const pulse = (rgb, lane, at, dur) => {
+    tl.set(pl, { rgb, lane }, at);
+    tl.fromTo(pl, { p: lane ? 1 : 0 }, { p: lane ? 0 : 1, duration: dur, ease: 'move' }, at);
+    tl.to(pl, { a: 1, duration: 0.08 }, at);
+    tl.to(pl, { a: 0, duration: 0.1, ease: 'exit' }, at + dur - 0.06);
+  };
+  const HOLD = 0.35;
+  const fly = (c, at) => {
+    tl.fromTo(c, { s: 0.6 }, { s: 1, duration: 0.32, ease: 'spring' }, at);
+    tl.to(c, { a: 1, duration: 0.1 }, at);
+    tl.to(c, { p: 1, duration: 0.7, ease: 'move' }, at + HOLD);            // held a moment so it can be read
+    tl.to(c, { s: 0.82, duration: 0.18, ease: 'exit' }, at + HOLD + 0.68);
+    tl.to(c, { a: 0, duration: 0.16, ease: 'exit' }, at + HOLD + 0.7);
+  };
+
+  // caption 1 is up from the first frame, so the first frame reads as a poster
+  gsap.set('#cap1 .num', { opacity: 1 });
+  gsap.set('#cap1 .w', { y: 0 });
+  gsap.set('#steps i:nth-child(1) b', { scaleX: 1 });
+
+  // ================= Beat 1: ask Codex (0 - 4.6) =================
+  tl.to(spot, { a: 1, duration: 0.5, ease: 'move' }, 0.3);
+  // typing 0.6-2.5 happens in apply()
+  tl.to('#u1', { opacity: 1, duration: 0.2 }, 2.68);
+  show('c1', 2.68, 0.22);
+  tl.to('#cxwork', { opacity: 1, duration: 0.2 }, 2.72);
+  show('c2', 3.05);
+  pulse('22,163,74', 0, 3.05, 0.45);
+  ring('#ringCc', '#16a34a', 3.5);
+  show('c3', 3.6); show('c4', 3.68); show('c5', 3.76);
+
+  // ================= Beat 2: Codex messages Claude (4.6 - 9.5) =================
+  capOut(1, 4.6); capIn(2, 4.96);
+  show('c6', 4.8);
+  fly(capA, 4.95);
+  pulse('234,88,12', 0, 5.3, 0.7);
+  ring('#ringCc', '#ea580c', 6.0);
+  spotTo(R.cc, 5.55);
+  tl.to('#q1', { opacity: 1, duration: 0.2 }, 6.02);
+  show('k0', 6.02); show('k1', 6.1); show('k2', 6.18);
+  tl.fromTo('#q1', { borderLeftColor: '#ea580c' }, { borderLeftColor: '#3a3a3c', duration: 1.4, ease: 'move' }, 6.08);
+  show('c7', 6.06);
+  tl.to('#ccstat', { opacity: 1, duration: 0.2 }, 6.35);
+  show('c8', 6.55);
+  tl.to('#cxwork', { opacity: 0, duration: 0.2 }, 6.55);
+  show('k3', 6.8);
+  show('k4', 7.45);
+  show('k5', 8.2); show('k6', 8.3);
+  show('k7', 9.0);
+  show('k8', 9.45);
+  tl.to('#ccstat', { opacity: 0, duration: 0.2 }, 9.45);
+
+  // ================= Beat 3: Claude answers (9.5 - 13.5) =================
+  capOut(2, 9.5); capIn(3, 9.86);
+  fly(capB, 9.42);
+  pulse('147,51,234', 1, 9.77, 0.7);
+  ring('#ringCx', '#9333ea', 10.47);
+  spotTo(R.cx, 10.0);
+  tl.to('#push', { opacity: 1, duration: 0.18 }, 10.47);
+  show('c9', 10.47); show('c10', 10.53); show('c11', 10.59); show('c12', 10.65); show('c13', 10.71);
+  tl.fromTo('#pushfl', { opacity: 0 }, { opacity: 1, duration: 0.12, ease: 'exit' }, 10.47);
+  tl.to('#pushfl', { opacity: 0, duration: 1.3, ease: 'move' }, 10.75);
+  tl.to('#cxwork', { opacity: 1, duration: 0.2 }, 10.95);
+
+  // ================= Beat 4: Codex keeps going (13.5 - 18.1) =================
+  capOut(3, 13.5); capIn(4, 13.86);
+  tl.to(flow, { a: 1, duration: 0.5, ease: 'move' }, 13.9);
+  show('c14', 14.0);
+  show('c15', 14.6); show('c16', 14.7);
+  show('c17', 15.2);
+  show('c18', 16.25);
+  show('c19', 16.8);
+  tl.to('#cxwork', { opacity: 0, duration: 0.2 }, 16.8);
+  tl.to(flow, { a: 0, duration: 0.4, ease: 'exit' }, 17.6);
+  SCROLLS.forEach(([at, v]) => tl.to(st, { scroll: v, duration: 0.4, ease: 'move' }, at));
+
+  // ================= End card (18.1 - 23.6) =================
+  capOut(4, 18.1);
+  tl.to(spot, { a: 0, duration: 0.45, ease: 'exit' }, 18.1);
+  tl.to('#cw', { opacity: 0, y: 14, duration: 0.4, ease: 'exit' }, 18.2);
+  tl.to(st, { dim: 0.86, blur: 10, duration: 0.8, ease: 'move' }, 18.2);
+  tl.fromTo('#eicon', { opacity: 0, scale: 0.3, rotation: -8 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.8, ease: 'spring' }, 18.5);
+  tl.fromTo('#er1', { opacity: 0.9, scale: 1 }, { opacity: 0, scale: 1.5, duration: 0.9, ease: 'enter' }, 18.62);
+  tl.fromTo('#er2', { opacity: 0.6, scale: 1 }, { opacity: 0, scale: 1.85, duration: 1.1, ease: 'enter' }, 18.74);
+  tl.fromTo('.end-i', { opacity: 0, y: 34 }, { opacity: 1, y: 0, duration: 0.6, stagger: 5 * F }, 18.65);
+  tl.to('#end', { scale: 1.025, duration: 4.9, ease: 'none', transformOrigin: '50% 50%' }, 18.7);
+  tl.set({}, {}, DURATION);
+
+  // ---- typing: the prompt types in over [t0, t1] with an uneven human rhythm ----
+  const typer = (str, t0, t1) => {
+    const w = [...str].map((ch, i) => (i && ' ,.'.includes(str[i - 1]) ? 1.9 : 0.6 + rnd() * 0.8));
+    const sum = w.reduce((a, b) => a + b, 0);
+    let acc = 0;
+    const at = w.map((x) => (acc += x, t0 + (t1 - t0) * acc / sum));
+    return (t) => { let n = 0; while (n < at.length && at[n] <= t) n++; return str.slice(0, n); };
+  };
+  const PROMPT = 'Sessions expire instantly. Ask Claude in ~/api how it sets exp.';
+  const typeP = typer(PROMPT, 0.6, 2.5);
+  const SUBMIT = 2.65;
+
+  // ---- apply: everything derived from the tweened state and t ----
+  const world = $('#world'), spotEl = $('#spot'), scrollEl = $('#cxscroll');
+  const capEls = [[$('#capA'), capA, flightA, capAz], [$('#capB'), capB, flightB, capBz]];
+  const pulseEl = $('#pulse');
+  const glows = { cx: $('#nCx .nglow'), br: $('#nBr .nglow'), cc: $('#nCc .nglow') };
+  const runs = $$('[data-run]').map((el) => ({ el, run: el.dataset.run.split(',').map(Number),
+    kind: el.classList.contains('vb') ? 'verb' : el.closest('#cxview') ? 'dot' : 'spin' }));
+  const SPIN = '✻✳✢·✢✳';
+  const VERBS = [[6.35, 'Reading…'], [7.45, 'Thinking…'], [8.95, 'Replying…']];
+  const bez = (f, p) => {
+    const u = 1 - p;
+    return { x: u * u * f.x0 + 2 * u * p * f.qx + p * p * f.x1, y: u * u * f.y0 + 2 * u * p * f.qy + p * p * f.y1 };
+  };
+  function apply(t) {
+    world.style.filter = st.blur > 0.05 ? `blur(${st.blur}px) brightness(${1 - st.dim})` : '';
+    Object.assign(spotEl.style, { left: `${spot.x}px`, top: `${spot.y}px`, width: `${spot.w}px`, height: `${spot.h}px`, opacity: spot.a });
+    scrollEl.style.transform = `translateY(${-st.scroll}px)`;
+
+    // the composer: typed prompt, then empty again once it's sent
+    const typed = t < SUBMIT ? typeP(t) : '';
+    const blink = Math.floor(t * 2) % 2 === 0;
+    $('#cxtxt').innerHTML = (typed ? typed : (t < 0.6 || t >= SUBMIT ? '<span class="ph2">Ask Codex to do anything</span>' : '')) +
+      (t < SUBMIT && t >= 0.6 ? '<span class="caret"></span>' : '');
+    // Codex's working line: a shimmer across "Working" and a seconds count per turn
+    const t0 = t < 10.3 ? 2.72 : 10.47;
+    $('#cxsec').textContent = `${Math.max(0, Math.floor(t - t0))}s`;
+    $('#shim').style.backgroundPosition = `${100 - ((t * 0.9) % 1) * 150}% 0`;
+    $('#wdot').style.opacity = 0.45 + 0.55 * (0.5 + 0.5 * Math.cos(t * 6));
+
+    // running tools: Codex's dot pulses and its verb is in the present tense; Claude's bullet spins
+    for (const { el, run: [a, b], kind } of runs) {
+      const running = t < b;
+      if (kind === 'verb') el.textContent = running ? el.dataset.a : el.dataset.b;
+      else if (kind === 'dot') {
+        el.style.color = running ? '#c7c7cc' : '#4ade80';
+        el.style.opacity = running ? 0.35 + 0.65 * (0.5 + 0.5 * Math.cos((t - a) * 9)) : 1;
+      } else {
+        el.textContent = running ? SPIN[Math.floor(t * 12) % SPIN.length] : '⏺';
+        el.style.color = running ? '#ff9f0a' : '#4ade80';
+      }
+    }
+    $('#ccspin').textContent = SPIN[Math.floor(t * 12) % SPIN.length];
+    $('#ccverb').textContent = VERBS.reduce((v, [at, w]) => (t >= at ? w : v), VERBS[0][1]);
+    $('#ccsec').textContent = `${Math.max(0, Math.floor(t - 6.02))}s`;
+    $('#blk').style.opacity = blink ? 1 : 0.15;
+
+    // the flying messages: a quadratic arc, leaning into the turn
+    for (const [el, c, f, z] of capEls) {
+      if (c.a <= 0.001) { el.style.opacity = 0; continue; }
+      const { x, y } = bez(f, c.p);
+      const lean = Math.sign(f.x1 - f.x0) * 5 * Math.sin(Math.PI * c.p);
+      el.style.opacity = c.a;
+      el.style.transform = `translate(${x - z.w / 2}px, ${y - z.h / 2}px) rotate(${lean}deg) scale(${c.s})`;
+    }
+
+    // the pulse: along the first lane segment, through the bridge, along the second
+    const [[a0, a1], [b0, b1]] = segs;
+    const span = b1 - a0;
+    const px = a0 + span * pl.p;
+    const inBridge = px > a1 && px < b0;
+    const ly = N.y + (pl.lane ? LANE : -LANE);
+    Object.assign(pulseEl.style, { transform: `translate(${px}px, ${ly}px)`, opacity: inBridge ? 0 : pl.a,
+      background: `rgb(${pl.rgb})`, boxShadow: `0 0 0 4px rgba(${pl.rgb}, .22), 0 0 18px 4px rgba(${pl.rgb}, .55)` });
+    const near = (x0, x1) => Math.max(0, 1 - Math.max(x0 - px, px - x1, 0) / 40);
+    const glowOf = (el, k) => { el.style.opacity = k * pl.a; el.style.boxShadow = `0 0 0 3px rgba(${pl.rgb}, .9), 0 0 30px rgba(${pl.rgb}, .45)`; };
+    glowOf(glows.br, inBridge ? 1 : near(a1, b0) * 0.6);
+    glowOf(glows.cx, pl.p < 0.08 ? near(-1e9, a0) * 0.8 : 0);
+    glowOf(glows.cc, pl.p > 0.92 ? near(b1, 1e9) * 0.8 : 0);
+    // the lanes: grey at rest, flowing rose dashes in beat 4 (out on top, back underneath)
+    lanes.forEach((l, i) => {
+      const back = i % 2 === 1;
+      const k = flow.a;
+      l.setAttribute('stroke', k > 0.01 ? `rgba(225, 29, 72, ${0.35 + 0.65 * k})` : '#c7c7cc');
+      l.setAttribute('stroke-dasharray', k > 0.01 ? '7 7' : 'none');
+      l.setAttribute('stroke-dashoffset', `${(back ? 1 : -1) * (t * 42 % 14)}`);
+    });
+  }
+
+  window.blurN = () => 1;                   // the camera never moves; the page blurs what flies
+  window.seek = (t) => { tl.seek(t, false); apply(t); };
+  window.DURATION = DURATION;
+
+  if (window.MB) {
+    MB.track('#capA, #capB', { pad: 40, gain: 0.2, max: 12 });   // a lighter blur, so the text still reads
+    MB.track('#pulse', { pad: 40 });
+    MB.install({});
+  }
+
+  const q = new URLSearchParams(location.search);
+  if (q.has('play')) {
+    const t0 = performance.now();
+    const loop = () => { window.seek(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); };
+    loop();
+  } else {
+    window.seek(parseFloat(q.get('t') || '0'));
+  }
+  window.ready = true;
+})();
+</script>
+</body>
+</html>
