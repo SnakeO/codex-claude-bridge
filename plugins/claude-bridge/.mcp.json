@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "claude-bridge": {
+      "command": "/bin/sh",
+      "args": ["-c", "exec \"${CODEX_MCP_NODE_PATH:-node}\" ./server/index.mjs"],
+      "cwd": ".",
+      "env_vars": ["CLAUDE_CONFIG_DIR", "CODEX_HOME", "CODEX_MCP_NODE_PATH", "CODEX_CLI_PATH", "CLAUDE_BRIDGE_PUSH", "CLAUDE_BRIDGE_SOCKET_DIR"],
+      "startup_timeout_sec": 20,
+      "tool_timeout_sec": 900,
+      "tools": {
+        "list_claude_sessions": { "approval_mode": "approve" },
+        "read_claude_messages": { "approval_mode": "approve" }
+      }
+    }
+  }
+}

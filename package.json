@@ -1,0 +1,15 @@
+{
+  "name": "codex-claude-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Codex plugin: two-way chat with the Claude Code sessions on your computer.",
+  "type": "module",
+  "license": "MIT",
+  "repository": "github:SnakeO/codex-claude-bridge",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

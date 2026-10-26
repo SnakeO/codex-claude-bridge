@@ -1,0 +1,31 @@
+{
+  "name": "claude-bridge",
+  "version": "0.1.0",
+  "description": "Two-way chat between Codex and the Claude Code sessions running on your computer.",
+  "author": {
+    "name": "Jacob Chapa",
+    "url": "https://github.com/SnakeO"
+  },
+  "homepage": "https://github.com/SnakeO/codex-claude-bridge",
+  "repository": "https://github.com/SnakeO/codex-claude-bridge",
+  "license": "MIT",
+  "keywords": ["claude", "claude-code", "agents", "messaging", "mcp"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Claude Bridge",
+    "shortDescription": "Message local Claude Code sessions and get their replies",
+    "longDescription": "Lets Codex find the Claude Code sessions running on this computer, send them messages, and receive their replies as new turns. It uses Claude Code's local peer messaging, so a Claude session can also message Codex with SendMessage.",
+    "developerName": "Jacob Chapa",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/SnakeO/codex-claude-bridge",
+    "defaultPrompt": [
+      "List the Claude Code sessions on this computer",
+      "Ask Claude Code to review my latest change"
+    ],
+    "brandColor": "#3D6B8E",
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/icon.svg"
+  }
+}
