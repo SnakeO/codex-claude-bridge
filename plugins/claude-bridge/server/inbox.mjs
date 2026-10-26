@@ -31,11 +31,13 @@ export function createInbox({ push, debounceMs = PUSH_DEBOUNCE_MS, onPushError }
     timer = undefined;
     if (!push || waiters.size > 0 || unread.length === 0) return;
     const batch = unread.splice(0);
+    // Counted from the start, so a read while `codex queue` runs says they're on their way
+    pushedSinceRead += batch.length;
     try {
       await push(batch);
-      pushedSinceRead += batch.length;
       lastPushError = undefined;
     } catch (err) {
+      pushedSinceRead = Math.max(0, pushedSinceRead - batch.length);
       unread.unshift(...batch);
       lastPushError = err?.message ?? String(err);
       onPushError?.(lastPushError);

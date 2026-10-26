@@ -77,3 +77,15 @@ test('wait times out empty, and stops early when aborted', async () => {
   assert.equal(inbox.status().waiting, 0);
   inbox.close();
 });
+
+test('a read while a push is running says the messages are on their way', async () => {
+  let release;
+  const inbox = createInbox({ push: () => new Promise((r) => (release = r)), debounceMs: 10 });
+  inbox.add(msg('in flight'));
+  await waitFor(() => release, { what: 'push start' });
+  const taken = inbox.take();
+  assert.deepEqual(taken.messages, []);
+  assert.equal(taken.pushedSinceRead, 1);
+  release();
+  inbox.close();
+});
